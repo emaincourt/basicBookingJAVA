@@ -25,12 +25,12 @@ public class DataAccess {
   public static final int CHILD_PRICE = 25;
   public static final int ADULT_PRICE = 50;
   
-  static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";  
-  static final String DB_URL = "jdbc:mysql://localhost:8889/";
+  /*static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";  
+  /static final String DB_URL = "jdbc:mysql://localhost:8889/";
   static final String DB_NAME = "booking";
   
   static final String USER = "root";
-  static final String PASS = "root";
+  static final String PASS = "root";*/
   
   Connection conn = null;
   PreparedStatement ps = null;
@@ -231,7 +231,7 @@ public class DataAccess {
    *
    * @return the number of each of the available seats
    * @throws DataAccessException if an unrecoverable error occurs
-     * @throws java.sql.SQLException
+   * @throws java.sql.SQLException
    */
   public ArrayList<Integer> getAvailableSeats() throws DataAccessException, SQLException {
       

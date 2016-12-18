@@ -235,7 +235,7 @@ public class DataAccess {
    */
   public ArrayList<Integer> getAvailableSeats() throws DataAccessException, SQLException {
       
-    String getReservedSeatsQuery = "SELECT SEAT FROM BOOKINGS;";
+    String getReservedSeatsQuery = "SELECT SEAT FROM BOOKINGS WHERE CUSTOMER IS NULL;";
     ArrayList <Integer> seatsList = new ArrayList <> ();
     
     try{
@@ -243,8 +243,7 @@ public class DataAccess {
         rs = ps.executeQuery();
         
         while(rs.next()){
-            if(rs.getString(3) == null)
-                seatsList.add(rs.getInt(1));
+            seatsList.add(rs.getInt(1));
         }
         
         rs.close();

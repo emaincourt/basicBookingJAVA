@@ -43,6 +43,7 @@ public class DataAccess {
     DataAccess myDataAccess = new DataAccess("jdbc:mysql://localhost:8889/booking","root","root");
     BookingInfo bi = myDataAccess.book("Elliot", 1, 0, true);
     BookingInfo bi2 = myDataAccess.book("Yi-Han", 2, 2, true);
+    BookingInfo bi3 = myDataAccess.book("Samuel", 0, 3, true);
     myDataAccess.close();
   }
   /**
@@ -94,10 +95,16 @@ public class DataAccess {
   
   public void createTriggerBeforeBooking() throws SQLException{
       try{
-        String trigger = "CREATE TRIGGER `before_booking_update` BEFORE UPDATE ON `BOOKINGS` FOR EACH ROW BEGIN IF (SELECT COUNT(*) FROM `ORDERS` WHERE CUSTOMER = NEW.CUSTOMER) = 0 THEN INSERT INTO `ORDERS` VALUES (NEW.CUSTOMER,0,NOW()); END IF; END";
-        ps = this.conn.prepareStatement(trigger);
+        String addCustomer = "CREATE TRIGGER `before_booking_update` BEFORE UPDATE ON `BOOKINGS` FOR EACH ROW BEGIN IF (SELECT COUNT(*) FROM `ORDERS` WHERE CUSTOMER = NEW.CUSTOMER) = 0 THEN INSERT INTO `ORDERS` VALUES (NEW.CUSTOMER,0,NOW()); END IF; END";
+        String updateCustomerAmount = "CREATE TRIGGER `after_booking_update` AFTER UPDATE ON `BOOKINGS` FOR EACH ROW BEGIN  UPDATE ORDERS SET AMOUNT = (SELECT PRICE FROM PRICES WHERE CLASS = 1)*(SELECT COUNT(*) FROM BOOKINGS WHERE CLASS = 1 AND CUSTOMER = NEW.CUSTOMER)+(SELECT PRICE FROM PRICES WHERE CLASS = 2)*(SELECT COUNT(*) FROM BOOKINGS WHERE CLASS = 2 AND CUSTOMER = NEW.CUSTOMER) WHERE CUSTOMER = NEW.CUSTOMER; END;";
+        ps = this.conn.prepareStatement(addCustomer);
         ps.execute();
-        ps.close();
+        if(ps != null)
+            ps.close();
+        ps = this.conn.prepareStatement(updateCustomerAmount);
+        ps.execute();
+        if(ps != null)
+            ps.close();
       }catch(SQLException e){
           System.out.println("Unable to create trigger.");
       }

@@ -250,9 +250,17 @@ public class DataAccess {
        
         int refund = childCount * 25 + adultCount * 50;
 
-        Statement stmt = this.conn.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT FROM ORDERS WHERE CUSTOMER="+customer);
+        String getAmount = "SELECT AMOUNT FROM ORDERS WHERE CUSTOMER=?";
+        ps = this.conn.prepareStatement(getAmount);
+        ps.setString(1,customer);
+        rs = ps.executeQuery();
+        ps.close();
+        
         int Amount = rs.getInt(1);
+        
+        if(rs!=null) rs.close(); 
+
+        
         
         if(Amount<refund){
             System.out.println("Vous ne pouvez être remboursé plus que ce que vous avez payé.");
@@ -300,12 +308,30 @@ public class DataAccess {
         ps.setString(2,customer);
         ps.executeUpdate();
         ps.close();
+                    
+        Date today = new java.util.Date();
+        int total = Amount - refund;
+        
+        ArrayList <Integer> seatsList = new ArrayList <> ();
+        String getTable = "SELECT SEAT FROM BOOKINGS WHERE CUSTOMER=?";
+        ps = this.conn.prepareStatement(getTable);
+        ps.setString(1,customer);
+        rs = ps.executeQuery();
+        ps.close();
+        
+        while(rs.next()){
+            seatsList.add(rs.getInt(1));
+        }
+        
+        if(rs!=null) rs.close(); 
 
-
+        BookingInfo booking = new BookingInfo(customer,total,today,seatsList);
+        return booking;
+        
     }catch(SQLException e){
         System.out.println("Unable to update field.");
     }
-    return null;
+      return null;
   }
 
   /**
@@ -383,8 +409,54 @@ public class DataAccess {
    * specified.
    * @throws DataAccessException if an unrecoverable error occurs
    */
-  public BookingInfo getBookingInfo(String customer) throws DataAccessException {
-    return null;
-  }
+  
+  public BookingInfo getBookingInfo(String customer) throws DataAccessException, SQLException {
+      try {
+        
+        if(customer==null){
+   
+       /* String getBookingQuery = "SELECT * FROM ORDERS ";
+        ps = this.conn.prepareStatement(getBookingQuery);
+        ps.executeQuery();
+        rs = ps.executeQuery();
+        ps.close();
+        
+        if(rs!=null) rs.close(); 
 
+       */
+      }else{
+            
+        String getBookingQuery = "SELECT * FROM ORDERS WHERE CUSTOMER=? ORDER BY ORDERS.ODATE DESC LIMIT 1";
+        ps = this.conn.prepareStatement(getBookingQuery);
+        ps.setString(1,customer);
+        rs = ps.executeQuery();
+        ps.close();
+        
+        int amount = rs.getInt(1);
+        Date date_order = rs.getDate(2);
+        
+        if(rs!=null) rs.close(); 
+
+        
+        ArrayList <Integer> seatsList = new ArrayList <> ();
+        String getTable = "SELECT SEAT FROM BOOKINGS WHERE CUSTOMER=?";
+        ps = this.conn.prepareStatement(getTable);
+        ps.setString(1,customer);
+        rs = ps.executeQuery();
+        ps.close();
+        
+        while(rs.next()){
+            seatsList.add(rs.getInt(1));
+        }
+        
+        if(rs!=null) rs.close(); 
+
+        BookingInfo booking = new BookingInfo(customer,amount,date_order,seatsList);
+        return booking;
+          
+      }
+      }catch(SQLException e){
+        System.out.println("Error during statement preparation.");
+    }
+      return null;
 }

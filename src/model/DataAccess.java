@@ -37,7 +37,14 @@ public class DataAccess {
   Connection conn = null;
   PreparedStatement ps = null;
   ResultSet rs = null;
-
+  
+  public static void main(String[] args) throws DataAccessException, ClassNotFoundException, SQLException{
+    
+    DataAccess myDataAccess = new DataAccess("jdbc:mysql://localhost:8889/booking","root","root");
+    BookingInfo bi = myDataAccess.book("Samuel", 3, 2, true);
+    System.out.println(bi.toString());
+    myDataAccess.close();
+  }
   /**
    * Creates a new <code>DataAccess</code> object that itneracts with the
    * specified database, using the specified login and password. Each object
@@ -172,12 +179,14 @@ public class DataAccess {
   
   public void insertEntry(int seat, int cl, String customer) throws SQLException{
     try{
-        String insertSeatsQuery = "UPDATE BOOKINGS SET CLASS = ?, CUSTOMER =  ? WHERE SEAT = ?";
-        ps = this.conn.prepareStatement(insertSeatsQuery);
+        String insertSeatQuery = "UPDATE BOOKINGS SET CLASS = ?, CUSTOMER = ? WHERE SEAT = ?;";
+        ps = this.conn.prepareStatement(insertSeatQuery);
         
         ps.setInt(1,cl);
         ps.setString(2,customer);
         ps.setInt(3,seat);
+        System.out.println(cl+" "+customer+" "+seat);
+        System.out.println(ps.toString());
         ps.executeUpdate();
         
         ps.close();

@@ -269,9 +269,11 @@ public class DataAccess {
         removeChildSeatsQuery = "DELETE from BOOKINGS"
                 + " where CLASS=? CUSTOMER=?"; 
         }else{
-        removeChildSeatsQuery = "DELETE from BOOKINGS"
-                + " where CLASS=? CUSTOMER=? in"
-                + " (select CUSTOMER, CLASS from BOOKINGS group by CUSTOMER having count(*)<?)";  
+        removeChildSeatsQuery = "DELETE FROM BOOKINGS "
+                + "WHERE SEAT IN (SELECT cid FROM "
+                + "(SELECT SEAT as cid FROM BOOKINGS WHERE CLASS=1 AND CUSTOMER='Abdel')"
+                + " as C )"
+                + "LIMIT 2";
         }
              
         ps = this.conn.prepareStatement(removeChildSeatsQuery);
@@ -287,11 +289,13 @@ public class DataAccess {
         removeParentSeatsQuery = "DELETE from BOOKINGS"
                 + " where CLASS=? CUSTOMER=?";
         }else{
-        removeParentSeatsQuery = "DELETE from BOOKINGS"
-                + " where CLASS=? CUSTOMER=? in"
-                + " (select CUSTOMER, CLASS from BOOKINGS group by CUSTOMER having count(*)<?)";
+        removeParentSeatsQuery ="DELETE FROM BOOKINGS "
+                + "WHERE SEAT IN (SELECT cid FROM "
+                + "(SELECT SEAT as cid FROM BOOKINGS WHERE CLASS=1 AND CUSTOMER='Abdel')"
+                + " as C )"
+                + "LIMIT 2";
+;
         }
-       
         ps = this.conn.prepareStatement(removeParentSeatsQuery);
         ps.setInt(1, 2);
         ps.setString(2, customer);

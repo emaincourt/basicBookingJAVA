@@ -269,10 +269,10 @@ public class DataAccess {
         
         String removeChildSeatsQuery = null;
         if(childCount==-1){
-        removeChildSeatsQuery = "DELETE from BOOKINGS"
+        removeChildSeatsQuery = "UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null "
                 + " where CLASS=? AND CUSTOMER=?"; 
         }else{
-        removeChildSeatsQuery = "DELETE FROM BOOKINGS "
+        removeChildSeatsQuery = "UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null"
                 + "WHERE SEAT IN (SELECT cid FROM "
                 + "(SELECT SEAT as cid FROM BOOKINGS WHERE CLASS=? AND CUSTOMER=?)"
                 + " as C )"
@@ -289,10 +289,10 @@ public class DataAccess {
             
         String removeParentSeatsQuery = null;
         if(adultCount==-1){
-        removeParentSeatsQuery = "DELETE from BOOKINGS"
+        removeParentSeatsQuery = "UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null"
                 + " where CLASS=? AND CUSTOMER=?";
         }else{
-        removeParentSeatsQuery ="DELETE FROM BOOKINGS "
+        removeParentSeatsQuery ="UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null"
                 + "WHERE SEAT IN (SELECT cid FROM "
                 + "(SELECT SEAT as cid FROM BOOKINGS WHERE CLASS=? AND CUSTOMER=?)"
                 + " as C )"

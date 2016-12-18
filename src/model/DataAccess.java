@@ -20,10 +20,12 @@ public class DataAccess {
 
   // To keep the emthods' interface simple, we assume there are only two
   // price classes: child and adult.
-  public static final int CHILD = 1;
-  public static final int ADULT = 2;
+  public static int CHILD = 1;
+  public static int ADULT = 2;
   public static final int CHILD_PRICE = 25;
   public static final int ADULT_PRICE = 50;
+  
+  
   
   /*static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";  
   /static final String DB_URL = "jdbc:mysql://localhost:8889/";
@@ -55,6 +57,13 @@ public class DataAccess {
         Class.forName("com.mysql.jdbc.Driver" );
         this.conn = DriverManager.getConnection(url, login, password );
         System.out.println("Connection established.");
+        
+        
+        Statement stmt = this.conn.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT PRICE FROM PRICES ORDER BY PRICES.CLASS ASC");
+        CHILD = rs.getInt(1);
+        ADULT = rs.getInt(2);
+        
     }
     catch (ClassNotFoundException e){
         System.out.println("Connection driver Class not found.");
@@ -194,7 +203,67 @@ public class DataAccess {
    * @throws DataAccessException if an unrecoverable error occurs
    */
   public BookingInfo cancel(String customer, int childCount, int adultCount) throws DataAccessException {
-    // TODO
+        try{
+        
+        if(customer==null || childCount<-1 || adultCount<-1) return null;
+       
+        int refund = childCount * 25 + adultCount * 50;
+
+        Statement stmt = this.conn.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT FROM ORDERS WHERE CUSTOMER="+customer);
+        int Amount = rs.getInt(1);
+        
+        if(Amount<refund){
+            System.out.println("Vous ne pouvez être remboursé plus que ce que vous avez payé.");
+            return null;
+        }
+        
+        String removeChildSeatsQuery = null;
+        if(childCount==-1){
+        removeChildSeatsQuery = "DELETE from BOOKINGS"
+                + " where CLASS=? CUSTOMER=?"; 
+        }else{
+        removeChildSeatsQuery = "DELETE from BOOKINGS"
+                + " where CLASS=? CUSTOMER=? in"
+                + " (select CUSTOMER, CLASS from BOOKINGS group by CUSTOMER having count(*)<?";  
+        }
+             
+        ps = this.conn.prepareStatement(removeChildSeatsQuery);
+        ps.setInt(1, 1);
+        ps.setString(2, customer);
+        if(childCount!=-1) ps.setInt(3, childCount);
+        ps.executeUpdate();
+        ps.close();
+        
+            
+        String removeParentSeatsQuery = null;
+        if(adultCount==-1){
+        removeParentSeatsQuery = "DELETE from BOOKINGS"
+                + " where CLASS=? CUSTOMER=?";
+        }else{
+        removeParentSeatsQuery = "DELETE from BOOKINGS"
+                + " where CLASS=? CUSTOMER=? in"
+                + " (select CUSTOMER, CLASS from BOOKINGS group by CUSTOMER having count(*)<?";
+        }
+       
+        ps = this.conn.prepareStatement(removeParentSeatsQuery);
+        ps.setInt(1, 2);
+        ps.setString(2, customer);
+        ps.setInt(3, adultCount);
+        ps.executeUpdate();
+        ps.close();
+        
+        String updateOrdersQuery = "UPDATE ORDERS SET AMOUNT=AMOUNT-? WHERE CUSTOMER=?";
+        ps = this.conn.prepareStatement(updateOrdersQuery);
+        ps.setInt(1,refund);
+        ps.setString(2,customer);
+        ps.executeUpdate();
+        ps.close();
+
+
+    }catch(SQLException e){
+        System.out.println("Unable to update field.");
+    }
     return null;
   }
 

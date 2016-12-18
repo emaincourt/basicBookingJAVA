@@ -22,8 +22,8 @@ public class DataAccess {
   // price classes: child and adult.
   public static int CHILD = 1;
   public static int ADULT = 2;
-  public static final int CHILD_PRICE = 25;
-  public static final int ADULT_PRICE = 50;
+  public static int CHILD_PRICE = 25;
+  public static int ADULT_PRICE = 50;
   
   
   
@@ -41,8 +41,8 @@ public class DataAccess {
   public static void main(String[] args) throws DataAccessException, ClassNotFoundException, SQLException{
     
     DataAccess myDataAccess = new DataAccess("jdbc:mysql://localhost:8889/booking","root","root");
-    BookingInfo bi = myDataAccess.book("Samuel", 3, 2, true);
-    System.out.println(bi.toString());
+    BookingInfo bi = myDataAccess.book("Elliot", 1, 0, true);
+    BookingInfo bi2 = myDataAccess.book("Yi-Han", 2, 2, true);
     myDataAccess.close();
   }
   /**
@@ -60,16 +60,28 @@ public class DataAccess {
    * @throws java.sql.SQLException
    */
   public DataAccess(String url, String login, String password) throws DataAccessException, ClassNotFoundException, SQLException {
-    try {
+    try {        
         Class.forName("com.mysql.jdbc.Driver" );
         this.conn = DriverManager.getConnection(url, login, password );
         System.out.println("Connection established.");
+        this.createTriggerBeforeBooking();
+        System.out.println("Trigger Created.");
         
         
-        Statement stmt = this.conn.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT PRICE FROM PRICES ORDER BY PRICES.CLASS ASC");
-        CHILD = rs.getInt(1);
-        ADULT = rs.getInt(2);
+        ps = this.conn.prepareStatement("SELECT * FROM PRICES;");
+        rs = ps.executeQuery();
+        
+        while(rs.next())
+        {
+            if(rs.getInt(1) == CHILD)
+                CHILD_PRICE = rs.getInt(2);
+            else if(rs.getInt(1) == ADULT)
+                ADULT_PRICE = rs.getInt(2);
+        }
+        if(ps != null)
+            ps.close();
+        if(rs != null)
+            rs.close();
         
     }
     catch (ClassNotFoundException e){
@@ -79,7 +91,17 @@ public class DataAccess {
         System.out.println("Unable to connect to DB.");
     }
   }
-
+  
+  public void createTriggerBeforeBooking() throws SQLException{
+      try{
+        String trigger = "CREATE TRIGGER `before_booking_update` BEFORE UPDATE ON `BOOKINGS` FOR EACH ROW BEGIN IF (SELECT COUNT(*) FROM `ORDERS` WHERE CUSTOMER = NEW.CUSTOMER) = 0 THEN INSERT INTO `ORDERS` VALUES (NEW.CUSTOMER,0,NOW()); END IF; END";
+        ps = this.conn.prepareStatement(trigger);
+        ps.execute();
+        ps.close();
+      }catch(SQLException e){
+          System.out.println("Unable to create trigger.");
+      }
+  }
   /**
    * Books the specified number of seats for the specified customer. The number
    * of seats is specified for each price class, in order to compute the total
@@ -101,6 +123,9 @@ public class DataAccess {
     
     try{
         ArrayList <Integer> seatsTable = getAvailableSeats();
+        
+        if(seatsTable == null)
+            return null;
         
         int amount = childCount * CHILD_PRICE + adultCount * ADULT_PRICE;
         Date today = new java.util.Date();

@@ -25,15 +25,6 @@ public class DataAccess {
   public static int CHILD_PRICE = 25;
   public static int ADULT_PRICE = 50;
   
-  
-  
-  /*static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";  
-  /static final String DB_URL = "jdbc:mysql://localhost:8889/";
-  static final String DB_NAME = "booking";
-  
-  static final String USER = "root";
-  static final String PASS = "root";*/
-  
   Connection conn = null;
   PreparedStatement ps = null;
   ResultSet rs = null;
@@ -66,9 +57,20 @@ public class DataAccess {
         this.conn = DriverManager.getConnection(url, login, password );
         System.out.println("Connection established.");
         this.createTriggerBeforeBooking();
-        System.out.println("Trigger Created.");
-        
-        
+        System.out.println("Triggers Created.");
+        this.getPrices();
+        System.out.println("Prices fetched.");
+    }
+    catch (ClassNotFoundException e){
+        System.out.println("Connection driver Class not found.");
+    }
+    catch (SQLException e){
+        System.out.println("Unable to connect to DB.");
+    }
+  }
+  
+  public void getPrices() throws SQLException{
+      try{
         ps = this.conn.prepareStatement("SELECT * FROM PRICES;");
         rs = ps.executeQuery();
         
@@ -83,14 +85,9 @@ public class DataAccess {
             ps.close();
         if(rs != null)
             rs.close();
-        
-    }
-    catch (ClassNotFoundException e){
-        System.out.println("Connection driver Class not found.");
-    }
-    catch (SQLException e){
-        System.out.println("Unable to connect to DB.");
-    }
+      }catch(SQLException e){
+          System.out.println("SQL error raised during prices fetch.");
+      }
   }
   
   public void createTriggerBeforeBooking() throws SQLException{
@@ -131,8 +128,10 @@ public class DataAccess {
     try{
         ArrayList <Integer> seatsTable = getAvailableSeats();
         
-        if(seatsTable == null)
+        if(seatsTable == null){
+            System.out.println("Aucun siège disponible dans les conditions établies.");
             return null;
+        }
         
         int amount = childCount * CHILD_PRICE + adultCount * ADULT_PRICE;
         Date today = new java.util.Date();
@@ -217,8 +216,6 @@ public class DataAccess {
         ps.setInt(1,cl);
         ps.setString(2,customer);
         ps.setInt(3,seat);
-        System.out.println(cl+" "+customer+" "+seat);
-        System.out.println(ps.toString());
         ps.executeUpdate();
         
         ps.close();
@@ -454,4 +451,5 @@ public class DataAccess {
         System.out.println("Error during statement preparation.");
     }
       return null;
+  }
 }

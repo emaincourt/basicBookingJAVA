@@ -267,7 +267,7 @@ public class DataAccess {
         }else{
         removeChildSeatsQuery = "DELETE from BOOKINGS"
                 + " where CLASS=? CUSTOMER=? in"
-                + " (select CUSTOMER, CLASS from BOOKINGS group by CUSTOMER having count(*)<?";  
+                + " (select CUSTOMER, CLASS from BOOKINGS group by CUSTOMER having count(*)<?)";  
         }
              
         ps = this.conn.prepareStatement(removeChildSeatsQuery);
@@ -285,7 +285,7 @@ public class DataAccess {
         }else{
         removeParentSeatsQuery = "DELETE from BOOKINGS"
                 + " where CLASS=? CUSTOMER=? in"
-                + " (select CUSTOMER, CLASS from BOOKINGS group by CUSTOMER having count(*)<?";
+                + " (select CUSTOMER, CLASS from BOOKINGS group by CUSTOMER having count(*)<?)";
         }
        
         ps = this.conn.prepareStatement(removeParentSeatsQuery);
@@ -405,28 +405,23 @@ public class DataAccess {
   
   public BookingInfo getBookingInfo(String customer) throws DataAccessException, SQLException {
       try {
+          
+        String getBookingQuery=null;
         
         if(customer==null){
-   
-       /* String getBookingQuery = "SELECT * FROM ORDERS ";
-        ps = this.conn.prepareStatement(getBookingQuery);
-        ps.executeQuery();
-        rs = ps.executeQuery();
-        ps.close();
+           getBookingQuery = "SELECT * FROM ORDERS ORDER BY ORDERS.ODATE DESC LIMIT 1";
+        }else{     
+           getBookingQuery = "SELECT * FROM ORDERS WHERE CUSTOMER=? ORDER BY ORDERS.ODATE DESC LIMIT 1";
+        }
         
-        if(rs!=null) rs.close(); 
-
-       */
-      }else{
-            
-        String getBookingQuery = "SELECT * FROM ORDERS WHERE CUSTOMER=? ORDER BY ORDERS.ODATE DESC LIMIT 1";
         ps = this.conn.prepareStatement(getBookingQuery);
         ps.setString(1,customer);
         rs = ps.executeQuery();
         ps.close();
         
-        int amount = rs.getInt(1);
-        Date date_order = rs.getDate(2);
+        String client = rs.getString(1);
+        int amount = rs.getInt(2);
+        Date date_order = rs.getDate(3);
         
         if(rs!=null) rs.close(); 
 
@@ -434,7 +429,7 @@ public class DataAccess {
         ArrayList <Integer> seatsList = new ArrayList <> ();
         String getTable = "SELECT SEAT FROM BOOKINGS WHERE CUSTOMER=?";
         ps = this.conn.prepareStatement(getTable);
-        ps.setString(1,customer);
+        ps.setString(1,client);
         rs = ps.executeQuery();
         ps.close();
         
@@ -448,7 +443,7 @@ public class DataAccess {
         return booking;
           
       }
-      }catch(SQLException e){
+      catch(SQLException e){
         System.out.println("Error during statement preparation.");
     }
       return null;

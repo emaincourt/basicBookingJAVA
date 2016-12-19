@@ -32,12 +32,16 @@ public class DataAccess {
   public static void main(String[] args) throws DataAccessException, ClassNotFoundException, SQLException{
     
     DataAccess myDataAccess = new DataAccess("jdbc:mysql://localhost:8889/booking","root","root");
-    BookingInfo bi2 = myDataAccess.book("Yi-Han", 2, 2, true);
-    BookingInfo bi3 = myDataAccess.book("Samuel", 0, 3, true);
-    //BookingInfo bi4 = myDataAccess.cancel("Samuel", 1, 1);
-    //BookingInfo bi5 = myDataAccess.cancel("Yi-Han", 0, 1);
-    //BookingInfo bi6 = myDataAccess.cancel("Elliot", 1, 0);
+    myDataAccess.book("Yi-Han", 2, 2, true);
+    myDataAccess.book("Samuel", 0, 3, true);
     System.out.println(myDataAccess.getBookingInfo("Yi-Han").toString());
+    System.out.println(myDataAccess.getBookingInfo("Elliot").toString());
+    System.out.println(myDataAccess.getBookingInfo("Samuel").toString());
+    myDataAccess.cancel("Yi-Han",-1,-1);
+    myDataAccess.cancel("Elliot",-1,-1);
+    myDataAccess.cancel("Samuel",-1,-1);
+    myDataAccess.book("Yi-Han", 2, 2, true);
+    System.out.println(myDataAccess.getBookingInfo(null).toString());
     myDataAccess.close();
   }
   /**
@@ -273,7 +277,7 @@ public class DataAccess {
                 + " where CLASS=? AND CUSTOMER=?"; 
         }else{
         removeChildSeatsQuery = "UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null"
-                + "WHERE SEAT IN (SELECT cid FROM "
+                + " WHERE SEAT IN (SELECT cid FROM "
                 + "(SELECT SEAT as cid FROM BOOKINGS WHERE CLASS=? AND CUSTOMER=?)"
                 + " as C )"
                 + "LIMIT ?";
@@ -283,6 +287,7 @@ public class DataAccess {
         ps.setInt(1, 1);
         ps.setString(2, customer);
         if(childCount!=-1) ps.setInt(3, childCount);
+        System.out.println(ps);
         ps.executeUpdate();
         if(ps!=null)    ps.close();
         
@@ -293,7 +298,7 @@ public class DataAccess {
                 + " where CLASS=? AND CUSTOMER=?";
         }else{
         removeParentSeatsQuery ="UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null"
-                + "WHERE SEAT IN (SELECT cid FROM "
+                + " WHERE SEAT IN (SELECT cid FROM "
                 + "(SELECT SEAT as cid FROM BOOKINGS WHERE CLASS=? AND CUSTOMER=?)"
                 + " as C )"
                 + "LIMIT ?";
@@ -303,6 +308,7 @@ public class DataAccess {
         ps.setInt(1, 2);
         ps.setString(2, customer);
         if(adultCount!=-1) ps.setInt(3, adultCount);
+        System.out.println(ps);
         ps.executeUpdate();
         if(ps!=null)    ps.close();
         
@@ -456,7 +462,7 @@ public class DataAccess {
         if(rs!=null)    rs.close(); 
         if(ps!=null)    ps.close();
 
-        BookingInfo booking = new BookingInfo(customer,amount,date_order,seatsList);
+        BookingInfo booking = new BookingInfo(client,amount,date_order,seatsList);
         return booking;
           
       }

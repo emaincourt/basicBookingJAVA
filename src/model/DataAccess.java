@@ -250,22 +250,27 @@ public class DataAccess {
   public BookingInfo cancel(String customer, int childCount, int adultCount) throws DataAccessException {
         try{
         
+        // si un des paramètres est faux, on retourne null
         if(customer==null || childCount<-1 || adultCount<-1) return null;
         int refund = childCount * 25 + adultCount * 50;
         int amount = 0;
-
+        
+        // pour avoir l'amount 
         String getAmount = "SELECT AMOUNT FROM ORDERS WHERE CUSTOMER=?";
         ps = this.conn.prepareStatement(getAmount);
         ps.setString(1,customer);
         rs = ps.executeQuery();
         
+        // on rentre l'amount dans notre variable
         while(rs.next())
             amount = rs.getInt(1);
+        
+        // on ferme le preparedStatement et le ResultSet
         if(rs!=null)    rs.close(); 
         if(ps!=null)    ps.close();
 
         
-        
+        // on s'assure que le remboursement n'est pas plus élévé que l'amount
         if(amount<refund){
             System.out.println("Vous ne pouvez être remboursé plus que ce que vous avez payé.");
             return null;
@@ -273,9 +278,11 @@ public class DataAccess {
         
         String removeChildSeatsQuery = null;
         if(childCount==-1){
+            // si la valeur childcount est -1 alors on annule toutes les réservations des enfants
         removeChildSeatsQuery = "UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null "
                 + " where CLASS=? AND CUSTOMER=?"; 
         }else{
+            // sinon on annule ChildCount réservations d'enfants
         removeChildSeatsQuery = "UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null"
                 + " WHERE SEAT IN (SELECT cid FROM "
                 + "(SELECT SEAT as cid FROM BOOKINGS WHERE CLASS=? AND CUSTOMER=?)"
@@ -284,19 +291,24 @@ public class DataAccess {
         }
              
         ps = this.conn.prepareStatement(removeChildSeatsQuery);
+        
+        // on set le customer, la classe, et le childcount si ce n'est pas -1
         ps.setInt(1, 1);
         ps.setString(2, customer);
         if(childCount!=-1) ps.setInt(3, childCount);
-        System.out.println(ps);
+        // on éxécute la query
         ps.executeUpdate();
+        // on ferme le preparedStatement
         if(ps!=null)    ps.close();
         
-            
+         // de même que ChildCount
         String removeParentSeatsQuery = null;
         if(adultCount==-1){
+            // si adultCount vaut -1 on annule toutes les réservations d'adultes
         removeParentSeatsQuery = "UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null"
                 + " where CLASS=? AND CUSTOMER=?";
         }else{
+            // sinon on annule adultCount réservations d'adultes
         removeParentSeatsQuery ="UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null"
                 + " WHERE SEAT IN (SELECT cid FROM "
                 + "(SELECT SEAT as cid FROM BOOKINGS WHERE CLASS=? AND CUSTOMER=?)"
@@ -305,36 +317,52 @@ public class DataAccess {
 ;
         }
         ps = this.conn.prepareStatement(removeParentSeatsQuery);
+        // on set la classe adult, le customer, et l'adultCount si ce n'est pas -1
         ps.setInt(1, 2);
         ps.setString(2, customer);
         if(adultCount!=-1) ps.setInt(3, adultCount);
-        System.out.println(ps);
+        // on éxécute la query
         ps.executeUpdate();
+        
+        // on ferme le preparedStatement 
         if(ps!=null)    ps.close();
         
+        // on update l'amount (amount-refund)
         String updateOrdersQuery = "UPDATE ORDERS SET AMOUNT=AMOUNT-? WHERE CUSTOMER=?";
         ps = this.conn.prepareStatement(updateOrdersQuery);
+        // on set le refund et  le customer remboursé
         ps.setInt(1,refund);
         ps.setString(2,customer);
+        // on exécute la query
         ps.executeUpdate();
+        
+        // on ferme le preparedStatement 
         if(ps!=null)    ps.close();
-                    
+        
+        
+        // la date du bookinginfo renvoyé (today car modifié)            
         Date today = new java.util.Date();
+        
+        // le total du bookinginfo renvoyé
         int total = amount - refund;
         
+        // la table des Seats mis à jour
         ArrayList <Integer> seatsList = new ArrayList <> ();
         String getTable = "SELECT SEAT FROM BOOKINGS WHERE CUSTOMER=?";
         ps = this.conn.prepareStatement(getTable);
         ps.setString(1,customer);
         rs = ps.executeQuery();
         
+        // on récupère les seats et on les ajoute
         while(rs.next()){
             seatsList.add(rs.getInt(1));
         }
         
+        // on ferme le resultSet et le preparedStatement
         if(rs!=null) rs.close(); 
         if(ps!=null)    ps.close();
 
+        // on renvoi le bookinginfo associé à la modification.
         BookingInfo booking = new BookingInfo(customer,total,today,seatsList);
         return booking;
         
@@ -424,14 +452,18 @@ public class DataAccess {
       String client = null;
       int amount = 0;
       Date date_order = null;
+      
+      
       try {
           
         String getBookingQuery=null;
         
         if(customer==null){
+            // si aucun customer n'a été donné on sélectionne la commande la plus récente de l'overall des customers
            getBookingQuery = "SELECT * FROM ORDERS ORDER BY ORDERS.ODATE DESC LIMIT 1";
            ps = this.conn.prepareStatement(getBookingQuery);
         }else{     
+            // si un customer est renseigné on choisit sa dernière commande
            getBookingQuery = "SELECT * FROM ORDERS WHERE CUSTOMER=? ORDER BY ORDERS.ODATE DESC LIMIT 1";
            ps = this.conn.prepareStatement(getBookingQuery);
            ps.setString(1,customer);
@@ -439,16 +471,21 @@ public class DataAccess {
         
         rs = ps.executeQuery();
         
+        // on rentre les résultats retournés dans nos variables servant au bookinginfo retourné
         while(rs.next()){
             client = rs.getString(1);
             amount = rs.getInt(2);
             date_order = rs.getDate(3);
         }
         
+        // on ferme les preparedStatement et ResultSet
+        
         if(rs!=null)    rs.close(); 
         if(ps!=null)    ps.close();
 
         
+        
+        // table des seats
         ArrayList <Integer> seatsList = new ArrayList <> ();
         String getTable = "SELECT SEAT FROM BOOKINGS WHERE CUSTOMER=?";
         ps = this.conn.prepareStatement(getTable);
@@ -458,10 +495,11 @@ public class DataAccess {
         while(rs.next()){
             seatsList.add(rs.getInt(1));
         }
-        
+        // on ferme les preparedStatements et les ResultSet
         if(rs!=null)    rs.close(); 
         if(ps!=null)    ps.close();
 
+        // l'objet booking info retourné
         BookingInfo booking = new BookingInfo(client,amount,date_order,seatsList);
         return booking;
           

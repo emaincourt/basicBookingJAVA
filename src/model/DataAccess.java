@@ -24,26 +24,11 @@ public class DataAccess {
   public static int ADULT = 2;
   public static int CHILD_PRICE = 25;
   public static int ADULT_PRICE = 50;
-  
+
   Connection conn = null;
   PreparedStatement ps = null;
   ResultSet rs = null;
-  
-  public static void main(String[] args) throws DataAccessException, ClassNotFoundException, SQLException{
-    
-    DataAccess myDataAccess = new DataAccess("jdbc:mysql://localhost:8889/booking","root","root");
-    myDataAccess.book("Yi-Han", 2, 2, true);
-    myDataAccess.book("Samuel", 0, 3, true);
-    System.out.println(myDataAccess.getBookingInfo("Yi-Han").toString());
-    System.out.println(myDataAccess.getBookingInfo("Elliot").toString());
-    System.out.println(myDataAccess.getBookingInfo("Samuel").toString());
-    myDataAccess.cancel("Yi-Han",-1,-1);
-    myDataAccess.cancel("Elliot",-1,-1);
-    myDataAccess.cancel("Samuel",-1,-1);
-    myDataAccess.book("Yi-Han", 2, 2, true);
-    System.out.println(myDataAccess.getBookingInfo(null).toString());
-    myDataAccess.close();
-  }
+
   /**
    * Creates a new <code>DataAccess</code> object that itneracts with the
    * specified database, using the specified login and password. Each object
@@ -59,28 +44,40 @@ public class DataAccess {
    * @throws java.sql.SQLException
    */
   public DataAccess(String url, String login, String password) throws DataAccessException, ClassNotFoundException, SQLException {
-    try {        
+    try {
+        // Initialisation du driver de connexion mySQL
         Class.forName("com.mysql.jdbc.Driver" );
+        // Connexion à la base de données
         this.conn = DriverManager.getConnection(url, login, password );
         System.out.println("Connection established.");
+        // Création des triggers dans la base
         this.createTriggerBeforeBooking();
         System.out.println("Triggers Created.");
+        // Récupération des prix
         this.getPrices();
         System.out.println("Prices fetched.");
     }
     catch (ClassNotFoundException e){
+        // Levée d'une exception de classe
         System.out.println("Connection driver Class not found.");
     }
     catch (SQLException e){
+        // Levée d'une exception SQL lors de l'exécution d'une requête
         System.out.println("Unable to connect to DB.");
     }
   }
-  
+
+  /**
+   * Récupère les prix des différentes classes
+   * @throws java.sql.SQLException
+   */
   public void getPrices() throws SQLException{
       try{
+        // Préparation de la requête de récupération des prix
         ps = this.conn.prepareStatement("SELECT * FROM PRICES;");
         rs = ps.executeQuery();
-        
+
+        // Parcours du ResultSet retourné à l'exécution de la requête
         while(rs.next())
         {
             if(rs.getInt(1) == CHILD)
@@ -88,28 +85,43 @@ public class DataAccess {
             else if(rs.getInt(1) == ADULT)
                 ADULT_PRICE = rs.getInt(2);
         }
+
+        // Fermeture des Statements et Requests si non échouées
         if(ps != null)
             ps.close();
         if(rs != null)
             rs.close();
       }catch(SQLException e){
+          // Levée d'une exception SQL si erreur au cours de la requête
           System.out.println("SQL error raised during prices fetch.");
       }
   }
-  
+
+  /**
+   * Création des triggers dans la base
+   *
+   * @throws java.sql.SQLException
+   */
   public void createTriggerBeforeBooking() throws SQLException{
       try{
+        // Création d'un trigger ajoutant l'utilisateur dans la base ORDERS avant réservation si absent
         String addCustomer = "CREATE TRIGGER `before_booking_update` BEFORE UPDATE ON `BOOKINGS` FOR EACH ROW BEGIN IF (SELECT COUNT(*) FROM `ORDERS` WHERE CUSTOMER = NEW.CUSTOMER) = 0 AND NEW.CUSTOMER IS NOT NULL THEN INSERT INTO `ORDERS` VALUES (NEW.CUSTOMER,0,NOW()); END IF; END";
+        // Création d'un trigger mettant à jour le montant de l'ORDER d'un client après modification de la table BOOKINGS
         String updateCustomerAmount = "CREATE TRIGGER `after_booking_update` AFTER UPDATE ON `BOOKINGS` FOR EACH ROW BEGIN IF NEW.CUSTOMER IS NOT NULL THEN UPDATE ORDERS SET AMOUNT = (SELECT PRICE FROM PRICES WHERE CLASS = 1)*(SELECT COUNT(*) FROM BOOKINGS WHERE CLASS = 1 AND CUSTOMER = NEW.CUSTOMER)+(SELECT PRICE FROM PRICES WHERE CLASS = 2)*(SELECT COUNT(*) FROM BOOKINGS WHERE CLASS = 2 AND CUSTOMER = NEW.CUSTOMER) WHERE CUSTOMER = NEW.CUSTOMER; END IF; END;";
+        // Préparation et exécution de la requête
         ps = this.conn.prepareStatement(addCustomer);
         ps.execute();
+        // Fermeture du Statement si réussi
         if(ps != null)
             ps.close();
+        // Préparation et exécution de la requête pour la déclaration du 2e trigger
         ps = this.conn.prepareStatement(updateCustomerAmount);
         ps.execute();
+        // Fermeture du Statement si réussi
         if(ps != null)
             ps.close();
       }catch(SQLException e){
+          // Levée d'une exception SQL en cas d'erreur lors de l'exécution
           System.out.println("Unable to create trigger.");
       }
   }
@@ -131,39 +143,52 @@ public class DataAccess {
    * @throws java.sql.SQLException
    */
   public BookingInfo book(String customer, int childCount, int adultCount, boolean groupedSeats) throws DataAccessException, SQLException {
-    
+
     try{
+        // ArrayList dans laquelle sont stockés les sièges libre et exécution de la méthode getAvailableSeats pour la récupération
+        //  de ces derniers
         ArrayList <Integer> seatsTable = getAvailableSeats();
-        
+
+        // Si aucun siège libre, on retourne pour stoper l'exécution
         if(seatsTable == null){
             System.out.println("Aucun siège disponible dans les conditions établies.");
             return null;
         }
-        
+
+        // Calcul du coût total de la réservation
         int amount = childCount * CHILD_PRICE + adultCount * ADULT_PRICE;
+        // Déclaration d'une instance de classe Data contenant la date actuelle
         Date today = new java.util.Date();
-        
+
+        // Si une demande de siège groupés a été effectuée
         if(groupedSeats){
+            // On récupère l'index du premier siège à partir duquel la réservation groupée peut se faire
             int startIndex = findIndexForGroupedSeats(childCount,adultCount,seatsTable);
-        
+
+            // Si -1, alors indisponible. On stoppe l'exécution
             if(startIndex == -1)
                 return null;
-        
+
+            // Sinon on écrit dans la base les réservations
             for(int i = 0; i < childCount; i++)
                 insertEntry(startIndex+i,CHILD,customer);
             for(int i = 0; i < adultCount; i++)
                 insertEntry(startIndex+childCount+i,ADULT,customer);
-            
+
+            // Puis instanciation d'un nouveau BookingInfo retourné
             BookingInfo booking = new BookingInfo(customer,amount,today,seatsTable);
             return booking;
         }
         else{
+            // Si la demande de sièges groupés n'a pas été effectuée, on teste le nombre de places disponibles
             if(seatsTable.size() >= childCount+adultCount){
 
+                // Puis on parcourt l'ArrayList
                 Iterator <Integer> it = seatsTable.iterator();
 
                 int counter = 0;
 
+                // On parcourt ensuite les places et inscrivons à la suite chaque adulte puis chaque enfant
                 while(it.hasNext() && counter < adultCount){
                     insertEntry(it.next(),ADULT,customer);
                     counter ++;
@@ -173,34 +198,53 @@ public class DataAccess {
                     insertEntry(it.next(),CHILD,customer);
                     counter ++;
                 }
-                
+
+                // Finalement instanciation d'un nouveau BookingInfo retourné
                 BookingInfo booking = new BookingInfo(customer,amount,today,seatsTable);
                 return booking;
             }
-        } 
+        }
     }catch(SQLException e){
+        // Levée d'une exception SQL en cas d'erreur lors de l'exécution
         System.out.println("SQL error, unable to update data.");
     }
     return null;
   }
-  
+
+  /**
+   * Trouve l'index du premier siège auquel l'inscription consécutive est possible
+   *
+   * @param childCount the number of seats to book for children
+   * @param adultCount the number of seats to book for adults
+   * @param seatsTable ArrayList des sièges libres
+   * @return un index de place dans l'ArrayList ou -1 si indisponible
+   */
   public int findIndexForGroupedSeats(int childCount, int adultCount, ArrayList seatsTable){
+      // L'index de départ vaut -1
       int index = -1;
+      // Le compteur nous permet de définir le nombre de places vides consécutives parcourues depuis index
       int counter = 0;
+      // i stocke l'index de l'itération suivante
       int i;
+      // Nombre total de sièges nécessaires
       int neededSeats = childCount + adultCount;
+      // Stockage du dernier indice de siège libre parcouru
       int prev = 0;
-      
+
       Iterator <Integer> it = seatsTable.iterator();
-      
+
+      // Tant que l'itération peut continuer et que nous n'avons pas suffisament de sièges
       while(it.hasNext() && counter != neededSeats){
-          
+
         i = it.next();
-        
+
+        // Si index vaut -1 alors il prend la valeur de i
         if(index == -1){
             index = i;
             counter ++;
         }
+        // Sinon, si i = prev + 1 soit est le siège consécutif direct au précédent, le compteur d'incrémente. Sinon
+        //  le compteur revient à 0 et index à -1
         else{
             if(i == prev + 1){
                 counter ++;
@@ -210,28 +254,47 @@ public class DataAccess {
                 index = -1;
             }
         }
+        // Prev prend la valeur de i pour la prochaine itération
         prev = i;
       }
+      // On retourne l'index (vaut -1 si pas de places)
       return index;
   }
-  
+
+  /**
+   * Books the specified number of seats for the specified customer. The number
+   * of seats is specified for each price class, in order to compute the total
+   * amount of the booking. In addition, the customer can require that the
+   * booked seats be grouped, i.e. they bear consecutive numbers. The booking is
+   * performed in a all or nothing fashion.
+   *
+   * @param customer the customer who makes the booking
+   * @param seat le siege à booker
+   * @param cl la classe de la réservation
+   * @throws java.sql.SQLException
+   */
   public void insertEntry(int seat, int cl, String customer) throws SQLException{
     try{
+        // On prépare le Statement pour insérer la nouvelle réservation
         String insertSeatQuery = "UPDATE BOOKINGS SET CLASS = ?, CUSTOMER = ? WHERE SEAT = ?;";
         ps = this.conn.prepareStatement(insertSeatQuery);
-        
+
+        // On injecte les valeurs adéquates
         ps.setInt(1,cl);
         ps.setString(2,customer);
         ps.setInt(3,seat);
+        // Puis on exécute la mise à jour
         ps.executeUpdate();
-        
-        ps.close();
-        
+        // On ferme ensuite le Statement
+        if(ps!=null)
+          ps.close();
+
     }catch(SQLException e){
+        // Levée d'une exception SQL en cas d'erreur lors de l'exécution de la requête
         System.out.println("Unable to update field.");
     }
   }
-  
+
   /**
    * Cancel, in whole or part, a previous booking made by the specified
    * customer. The cancellation specifies the number of seats to cancel in each
@@ -249,38 +312,38 @@ public class DataAccess {
    */
   public BookingInfo cancel(String customer, int childCount, int adultCount) throws DataAccessException {
         try{
-        
+
         // si un des paramètres est faux, on retourne null
         if(customer==null || childCount<-1 || adultCount<-1) return null;
         int refund = childCount * 25 + adultCount * 50;
         int amount = 0;
-        
-        // pour avoir l'amount 
+
+        // pour avoir l'amount
         String getAmount = "SELECT AMOUNT FROM ORDERS WHERE CUSTOMER=?";
         ps = this.conn.prepareStatement(getAmount);
         ps.setString(1,customer);
         rs = ps.executeQuery();
-        
+
         // on rentre l'amount dans notre variable
         while(rs.next())
             amount = rs.getInt(1);
-        
+
         // on ferme le preparedStatement et le ResultSet
-        if(rs!=null)    rs.close(); 
+        if(rs!=null)    rs.close();
         if(ps!=null)    ps.close();
 
-        
+
         // on s'assure que le remboursement n'est pas plus élévé que l'amount
         if(amount<refund){
             System.out.println("Vous ne pouvez être remboursé plus que ce que vous avez payé.");
             return null;
         }
-        
+
         String removeChildSeatsQuery = null;
         if(childCount==-1){
             // si la valeur childcount est -1 alors on annule toutes les réservations des enfants
         removeChildSeatsQuery = "UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null "
-                + " where CLASS=? AND CUSTOMER=?"; 
+                + " where CLASS=? AND CUSTOMER=?";
         }else{
             // sinon on annule ChildCount réservations d'enfants
         removeChildSeatsQuery = "UPDATE BOOKINGS SET CUSTOMER=null, CLASS=null"
@@ -289,9 +352,9 @@ public class DataAccess {
                 + " as C )"
                 + "LIMIT ?";
         }
-             
+
         ps = this.conn.prepareStatement(removeChildSeatsQuery);
-        
+
         // on set le customer, la classe, et le childcount si ce n'est pas -1
         ps.setInt(1, 1);
         ps.setString(2, customer);
@@ -300,7 +363,7 @@ public class DataAccess {
         ps.executeUpdate();
         // on ferme le preparedStatement
         if(ps!=null)    ps.close();
-        
+
          // de même que ChildCount
         String removeParentSeatsQuery = null;
         if(adultCount==-1){
@@ -323,10 +386,10 @@ public class DataAccess {
         if(adultCount!=-1) ps.setInt(3, adultCount);
         // on éxécute la query
         ps.executeUpdate();
-        
-        // on ferme le preparedStatement 
+
+        // on ferme le preparedStatement
         if(ps!=null)    ps.close();
-        
+
         // on update l'amount (amount-refund)
         String updateOrdersQuery = "UPDATE ORDERS SET AMOUNT=AMOUNT-? WHERE CUSTOMER=?";
         ps = this.conn.prepareStatement(updateOrdersQuery);
@@ -335,37 +398,37 @@ public class DataAccess {
         ps.setString(2,customer);
         // on exécute la query
         ps.executeUpdate();
-        
-        // on ferme le preparedStatement 
+
+        // on ferme le preparedStatement
         if(ps!=null)    ps.close();
-        
-        
-        // la date du bookinginfo renvoyé (today car modifié)            
+
+
+        // la date du bookinginfo renvoyé (today car modifié)
         Date today = new java.util.Date();
-        
+
         // le total du bookinginfo renvoyé
         int total = amount - refund;
-        
+
         // la table des Seats mis à jour
         ArrayList <Integer> seatsList = new ArrayList <> ();
         String getTable = "SELECT SEAT FROM BOOKINGS WHERE CUSTOMER=?";
         ps = this.conn.prepareStatement(getTable);
         ps.setString(1,customer);
         rs = ps.executeQuery();
-        
+
         // on récupère les seats et on les ajoute
         while(rs.next()){
             seatsList.add(rs.getInt(1));
         }
-        
+
         // on ferme le resultSet et le preparedStatement
-        if(rs!=null) rs.close(); 
+        if(rs!=null) rs.close();
         if(ps!=null)    ps.close();
 
         // on renvoi le bookinginfo associé à la modification.
         BookingInfo booking = new BookingInfo(customer,total,today,seatsList);
         return booking;
-        
+
     }catch(SQLException e){
         System.out.println("Unable to update field at Samuel.");
     }
@@ -379,21 +442,22 @@ public class DataAccess {
    * @throws DataAccessException if an unrecoverable error occurs
    */
   public void close() throws DataAccessException, SQLException {
-    try { 
-        if (rs != null) 
-            rs.close(); 
+    // On teste une à une la valeur des attributs de connexion de la classe et les fermons si non nuls
+    try {
+        if (rs != null)
+            rs.close();
     } catch (SQLException e) {
         System.out.println("Unable to close ResultSet.");
     };
-    try { 
-        if (ps != null) 
-            ps.close(); 
+    try {
+        if (ps != null)
+            ps.close();
     } catch (SQLException e) {
         System.out.println("Unable to close PreparedStatement.");
     };
-    try { 
-        if (conn != null) 
-            conn.close(); 
+    try {
+        if (conn != null)
+            conn.close();
     } catch (SQLException e) {
         System.out.println("Unable to close Connection.");
     };
@@ -408,25 +472,25 @@ public class DataAccess {
    * @throws java.sql.SQLException
    */
   public ArrayList<Integer> getAvailableSeats() throws DataAccessException, SQLException {
-      
+
     String getReservedSeatsQuery = "SELECT SEAT FROM BOOKINGS WHERE CUSTOMER IS NULL;";
     ArrayList <Integer> seatsList = new ArrayList <> ();
-    
+
     try{
         ps = conn.prepareStatement(getReservedSeatsQuery);
         rs = ps.executeQuery();
-        
+
         while(rs.next()){
             seatsList.add(rs.getInt(1));
         }
-        
+
         rs.close();
         ps.close();
-        
+
     }catch(SQLException e){
         System.out.println("Error during statement preparation.");
     }
-    
+
     if(seatsList.size()>0)
         return seatsList;
     else
@@ -447,62 +511,62 @@ public class DataAccess {
    * specified.
    * @throws DataAccessException if an unrecoverable error occurs
    */
-  
+
   public BookingInfo getBookingInfo(String customer) throws DataAccessException, SQLException {
       String client = null;
       int amount = 0;
       Date date_order = null;
-      
-      
+
+
       try {
-          
+
         String getBookingQuery=null;
-        
+
         if(customer==null){
             // si aucun customer n'a été donné on sélectionne la commande la plus récente de l'overall des customers
            getBookingQuery = "SELECT * FROM ORDERS ORDER BY ORDERS.ODATE DESC LIMIT 1";
            ps = this.conn.prepareStatement(getBookingQuery);
-        }else{     
+        }else{
             // si un customer est renseigné on choisit sa dernière commande
            getBookingQuery = "SELECT * FROM ORDERS WHERE CUSTOMER=? ORDER BY ORDERS.ODATE DESC LIMIT 1";
            ps = this.conn.prepareStatement(getBookingQuery);
            ps.setString(1,customer);
         }
-        
+
         rs = ps.executeQuery();
-        
+
         // on rentre les résultats retournés dans nos variables servant au bookinginfo retourné
         while(rs.next()){
             client = rs.getString(1);
             amount = rs.getInt(2);
             date_order = rs.getDate(3);
         }
-        
+
         // on ferme les preparedStatement et ResultSet
-        
-        if(rs!=null)    rs.close(); 
+
+        if(rs!=null)    rs.close();
         if(ps!=null)    ps.close();
 
-        
-        
+
+
         // table des seats
         ArrayList <Integer> seatsList = new ArrayList <> ();
         String getTable = "SELECT SEAT FROM BOOKINGS WHERE CUSTOMER=?";
         ps = this.conn.prepareStatement(getTable);
         ps.setString(1,client);
         rs = ps.executeQuery();
-        
+
         while(rs.next()){
             seatsList.add(rs.getInt(1));
         }
         // on ferme les preparedStatements et les ResultSet
-        if(rs!=null)    rs.close(); 
+        if(rs!=null)    rs.close();
         if(ps!=null)    ps.close();
 
         // l'objet booking info retourné
         BookingInfo booking = new BookingInfo(client,amount,date_order,seatsList);
         return booking;
-          
+
       }
       catch(SQLException e){
         System.out.println("Error during statement preparation.");
